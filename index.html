@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
     <meta charset="utf-8">
-    <title>ZenFlow - Nehir Vadisi Pırpır Uçuşu</title>
+    <title>ZenFlow - Tam Doğrulanmış Kontrollü Pırpır Uçuşu</title>
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&family=Azeret+Mono&display=swap" rel="stylesheet">
     
@@ -76,7 +76,7 @@
     <div id="start-screen">
         <div class="glass-panel">
             <h2>ZEN VADİSİ UÇUŞU</h2>
-            <p>Gelişmiş 3D Servikal Mobilizasyon<br>Dik oturun, karşıya bakın ve başlayın. Aşağıdaki nehir yüksekliğinizi anlamanıza yardımcı olacaktır.</p>
+            <p>Eksenleri Düzeltilmiş Mobilizasyon Seansı<br>Karşıya bakarak başlayın. Baş yukarı -> Uçak Yukarı. Baş aşağı -> Uçak Aşağı.</p>
             
             <div class="menu-group">
                 <label for="speed-select">Uçuş Hızı</label>
@@ -107,11 +107,10 @@
         <a-entity id="flight-core" position="0 0 0">
             
             <a-entity id="player-plane" position="0 -0.15 -2.5" rotation="0 0 0">
-                
                 <a-cone color="#b38b6d" radius-bottom="0.16" radius-top="0.04" height="0.8" rotation="90 0 0" position="0 0 0"></a-cone>
                 <a-box color="#e2e8f0" width="0.12" height="0.08" depth="0.06" position="0 0.12 -0.1" opacity="0.7"></a-box>
                 
-                <a-box color="#5f7d6e" width="1.8" height="0.03" depth="0.24" position="0 0.24 -0.05" src="https://raw.githubusercontent.com/aframevr/aframe/master/examples/boilerplate/panorama/puydesancy.jpg" repeat="2 1" roughness="0.6"></a-box>
+                <a-box color="#5f7d6e" width="1.8" height="0.03" depth="0.24" position="0 0.24 -0.05"></a-box>
                 <a-box color="#5f7d6e" width="1.8" height="0.03" depth="0.24" position="0 -0.12 -0.05"></a-box>
                 
                 <a-cylinder color="#94a3b8" radius="0.008" height="0.36" position="0.8 0.06 -0.05"></a-cylinder>
@@ -127,10 +126,9 @@
                 <a-box color="#94a3b8" width="0.4" height="0.02" depth="0.02" position="0 -0.18 -0.1"></a-box>
 
                 <a-sphere color="#3e3830" radius="0.12" position="0 0 -0.4" scale="1 1 1.3"></a-sphere>
-                
                 <a-entity id="propeller" position="0 0 -0.52">
                     <a-box color="#1e293b" width="0.75" height="0.05" depth="0.015"></a-box>
-                    <a-circle color="#b38b6d" radius="0.04" position="0 0 -0.01" rotation="0 0 0"></a-circle>
+                    <a-circle color="#b38b6d" radius="0.04" position="0 0 -0.01"></a-circle>
                 </a-entity>
             </a-entity>
 
@@ -179,11 +177,9 @@
         let basePitch = null;
         let isCalibrated = false;
 
-        // VADİ VE DOĞAL ORTAMIN İNŞASI (Referans Algısı İçin)
         for(let i=0; i<60; i++) {
             let currentZ = -i * 25;
             
-            // Sol Vadi Yeşillikleri
             let lHill = document.createElement('a-cone');
             lHill.setAttribute('color', '#a7f3d0');
             lHill.setAttribute('radius-bottom', '8');
@@ -191,7 +187,6 @@
             lHill.setAttribute('position', `${-14 - (Math.random()*4)} -5.0 ${currentZ}`);
             leftHills.appendChild(lHill);
 
-            // Sağ Vadi Yeşillikleri
             let rHill = document.createElement('a-cone');
             rHill.setAttribute('color', '#a7f3d0');
             rHill.setAttribute('radius-bottom', '8');
@@ -199,7 +194,6 @@
             rHill.setAttribute('position', `${14 + (Math.random()*4)} -5.0 ${currentZ}`);
             rightHills.appendChild(rHill);
 
-            // Nehir kenarına küçük zen kayaları (Yükseklik/Hız hissini perçinler)
             if (i % 2 === 0) {
                 let rock = document.createElement('a-dodecahedron');
                 rock.setAttribute('color', '#cbd5e1');
@@ -232,12 +226,12 @@
 
             window.addEventListener('deviceorientation', processBioFeedbackSensors);
 
-            // Gelişmiş Klavye Desteği (Masaüstü için Tam Aralık)
+            // Klavye Test Yönleri Senkronizasyonu
             window.addEventListener('keydown', (e) => {
-                if (e.key === 'ArrowLeft') targetX = -6.0; 
-                if (e.key === 'ArrowRight') targetX = 6.0;
-                if (e.key === 'ArrowUp') targetY = 4.5;
-                if (e.key === 'ArrowDown') targetY = -3.2;
+                if (e.key === 'ArrowLeft') targetX = -6.5; 
+                if (e.key === 'ArrowRight') targetX = 6.5;
+                if (e.key === 'ArrowUp') targetY = 5.0; // Klavye yukarı -> Uçak Yukarı
+                if (e.key === 'ArrowDown') targetY = -3.5; // Klavye aşağı -> Uçak Aşağı
             });
             window.addEventListener('keyup', () => { targetX = currentX; targetY = currentY; });
 
@@ -255,7 +249,7 @@
             spawnInterval = setInterval(generateNextRing, ringFrequency);
         }
 
-        // MAKSİMUM DOZDA HASSASLAŞTIRILMIŞ BOYUN SENSÖR MOTORU
+        // DÜZELTİLMİŞ VE YÖNLERİ DOĞRULANMIŞ SENSÖR MOTORU
         function processBioFeedbackSensors(event) {
             let rawTilt = event.gamma; 
             if (window.orientation === 90) rawTilt = event.beta;
@@ -274,35 +268,30 @@
             let deltaTilt = rawTilt - baseTilt;
             let deltaPitch = rawPitch - basePitch;
 
-            // Titreşim filtresini konfor alanına çektim (Sıfır gecikme hissi)
             if (Math.abs(deltaTilt) < 1.5) deltaTilt = 0;
             if (Math.abs(deltaPitch) < 1.5) deltaPitch = 0;
 
-            // Klinik boyun güvenliği için koruma marjı
             let clampedDeltaTilt = Math.max(-18, Math.min(18, deltaTilt));
             let clampedDeltaPitch = Math.max(-18, Math.min(18, deltaPitch));
 
-            // ULTRA GENİŞ KONTROL RANGE ARALIĞI
-            // Çarpanı büyüterek hastanın en ufak boyun hamlesinde uçağın tüm ekrana hükmetmesini sağladım
+            // HAREKET YÖNÜ DÜZELTMESİ CRITICAL:
+            // deltaPitch negatif olduğunda baş yukarı kalkıyor demektir. 
+            // Bunu uçağın pozitif Y eksenine (Yukarı tırmanışa) çevirmek için işareti '+' yaptık.
             targetX = (clampedDeltaTilt / 18) * 6.5;   
-            targetY = (-clampedDeltaPitch / 18) * 4.8; 
+            targetY = (clampedDeltaPitch / 18) * 5.0; // Eksi işareti kaldırıldı, yön fiziksel hareketle tam eşitlendi.
 
-            // Uçağın aerodinamik yatış açısı tepkisi
             playerPlane.setAttribute('rotation', `0 0 ${-clampedDeltaTilt * 2.2}`);
         }
 
         let propRotation = 0;
         function renderLoop() {
-            // İleri Doğru Hareket
             let corePos = flightCore.getAttribute('position');
             corePos.z -= forwardSpeed;
 
-            // Nehir düzlemini de uçakla birlikte ileri kaydırarak sonsuzluk hissi yarat (Optimizasyon)
             let rPos = zenRiver.getAttribute('position');
             rPos.z = corePos.z;
             zenRiver.setAttribute('position', rPos);
 
-            // Yumuşak Takip (Lerp) katsayısını artırarak yanıt süresini hızlandırdım (0.15 -> 0.22)
             currentX += (targetX - currentX) * 0.22;
             currentY += (targetY - currentY) * 0.22;
             
@@ -310,7 +299,6 @@
             corePos.y = currentY;
             flightCore.setAttribute('position', corePos);
 
-            // Pervaneyi Döndür
             propRotation += 35;
             propeller.setAttribute('rotation', `0 0 ${propRotation}`);
 
@@ -328,9 +316,8 @@
             let corePos = flightCore.getAttribute('position');
             let spawnZ = corePos.z - 45; 
 
-            // Yeni genişletilmiş uçuş otobanına paralel halka koordinatları
-            let spawnX = (Math.random() - 0.5) * 10.0; // Geniş yatay eksen dağılımı
-            let spawnY = (Math.random() - 0.5) * 6.5;  // Geniş dikey eksen dağılımı (-3.25 ile +3.25 arası)
+            let spawnX = (Math.random() - 0.5) * 10.0; 
+            let spawnY = (Math.random() - 0.5) * 6.5;  
 
             let ring = document.createElement('a-torus');
             ring.setAttribute('id', `ring-${ringCounter++}`);
