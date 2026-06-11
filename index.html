@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
     <meta charset="utf-8">
-    <title>ZenFlow - Kalibrasyonsuz Estetik Uçuş Seansı</title>
+    <title>ZenFlow - Dinamik Motor Sesli Uçuş Seansı</title>
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&family=Azeret+Mono&display=swap" rel="stylesheet">
     
@@ -75,8 +75,8 @@
 
     <div id="start-screen">
         <div class="glass-panel">
-            <h2>ZEN VADİSİ UÇUŞU v2</h2>
-            <p>Sabit Dik Eksenli Rehabilitasyon Seansı<br>Telefonun tam dik (90°) durduğu pozisyon merkezdir. Arka plan müziği eşliğinde büyük halkaları hedefleyin.</p>
+            <h2>ZEN VADİSİ UÇUŞU v4</h2>
+            <p>Dinamik Motor Sesli ve Süzülen Kontrol Motoru<br>Uçağın irtifa değişimleri ve dönüşleri, gerçek zamanlı akustik ses motoruyla kulaklarınıza yansıtılır.</p>
             
             <div class="menu-group">
                 <label for="speed-select">Uçuş Hızı</label>
@@ -95,7 +95,7 @@
                 </select>
             </div>
 
-            <button id="start-btn">MÜZİKLİ SEANSI BAŞLAT</button>
+            <button id="start-btn">MOTORU ÇALIŞTIR VE BAŞLAT</button>
         </div>
     </div>
 
@@ -107,7 +107,7 @@
         <a-entity id="flight-core" position="0 0 0">
             
             <a-entity id="player-plane" position="0 -0.15 -2.5" rotation="0 0 0">
-                <a-cone color="#b38b6d" radius-bottom="0.16" radius-top="0.04" height="0.8" rotation="90 0 0" position="0 0 0"></a-cone>
+                <a-cone color="#b38b6d" radius-bottom="0.16" radius-top="0.04" height="0.8" rotation="90 0 0"></a-cone>
                 <a-box color="#e2e8f0" width="0.12" height="0.08" depth="0.06" position="0 0.12 -0.1" opacity="0.7"></a-box>
                 
                 <a-box color="#5f7d6e" width="1.8" height="0.03" depth="0.24" position="0 0.24 -0.05"></a-box>
@@ -167,9 +167,14 @@
         let timeLeft = 180; 
         let clockInterval, spawnInterval, frameId, wakeLock = null;
         
-        // SES MOTORU DEĞİŞKENLERİ
+        // SES SİSTEMİ DEĞİŞKENLERİ
         let audioCtx = null;
         let ambientBpmInterval = null;
+        
+        // DİNAMİK MOTOR SESİ MODÜLLERİ
+        let engineOsc = null;
+        let engineFilter = null;
+        let engineGain = null;
 
         let forwardSpeed = 0.17; 
         let ringFrequency = 2200; 
@@ -179,7 +184,10 @@
         let currentX = 0;
         let currentY = 0;
 
-        // Vadi İnşası
+        let targetPlaneTilt = 0;
+        let currentPlaneTilt = 0;
+
+        // Vadi Tasarımı
         for(let i=0; i<60; i++) {
             let currentZ = -i * 25;
             
@@ -226,9 +234,11 @@
             startScreen.style.display = 'none';
             uiOverlay.style.display = 'block';
             
-            // Web Audio API Başlatma ve Ortam Müziği Motoru
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            
+            // SESLERİ BAŞLAT
             startAmbientZenMusic();
+            initEngineSoundSimulator();
 
             window.addEventListener('deviceorientation', processBioFeedbackSensors);
 
@@ -254,7 +264,6 @@
             spawnInterval = setInterval(generateNextRing, ringFrequency);
         }
 
-        // TAMAMEN KALİBRASYONSUZ SABİT DİK EKSEN MOTORU
         function processBioFeedbackSensors(event) {
             let rawTilt = event.gamma; 
             if (window.orientation === 90) rawTilt = event.beta;
@@ -263,11 +272,9 @@
 
             if (rawTilt === null || rawPitch === null) return;
 
-            // Klinik Kural: Telefonun yere tam dik durduğu konum beta = 90 derecedir. 
-            // Hastanın konforlu okuma ve tutuş açısını dengelemek için nötral dikey ekseni 75 dereceye sabitledik.
             let verticalNeutral = 75; 
             
-            let deltaTilt = rawTilt; // Telefon düz durduğunda gamma zaten sıfıra yakındır
+            let deltaTilt = rawTilt; 
             let deltaPitch = rawPitch - verticalNeutral; 
 
             if (Math.abs(deltaTilt) < 1.5) deltaTilt = 0;
@@ -276,11 +283,10 @@
             let clampedDeltaTilt = Math.max(-20, Math.min(20, deltaTilt));
             let clampedDeltaPitch = Math.max(-20, Math.min(20, deltaPitch));
 
-            // Tam dikey bağımlı yön eşleme (Hassaslaştırılmış çarpanlar)
             targetX = (clampedDeltaTilt / 20) * 6.5;   
             targetY = (clampedDeltaPitch / 20) * 5.0; 
-
-            playerPlane.setAttribute('rotation', `0 0 ${-clampedDeltaTilt * 2.2}`);
+            
+            targetPlaneTilt = -clampedDeltaTilt * 2.2;
         }
 
         let propRotation = 0;
@@ -288,7 +294,6 @@
             let corePos = flightCore.getAttribute('position');
             corePos.z -= forwardSpeed;
 
-            // Nehir takibi (Sonsuz akış görünümü)
             let rPos = zenRiver.getAttribute('position');
             rPos.z = corePos.z;
             zenRiver.setAttribute('position', rPos);
@@ -297,12 +302,19 @@
             rcPos.z = corePos.z;
             riverCore.setAttribute('position', rcPos);
 
-            currentX += (targetX - currentX) * 0.22;
-            currentY += (targetY - currentY) * 0.22;
+            // Akışkan süzülme takibi (0.05)
+            currentX += (targetX - currentX) * 0.05;
+            currentY += (targetY - currentY) * 0.05;
+            currentPlaneTilt += (targetPlaneTilt - currentPlaneTilt) * 0.05;
             
             corePos.x = currentX;
             corePos.y = currentY;
             flightCore.setAttribute('position', corePos);
+
+            playerPlane.setAttribute('rotation', `0 0 ${currentPlaneTilt}`);
+
+            // YENİ: ANLIK HAREKETE GÖRE DİNAMİK MOTOR SESİ AYARLAMA MOTORU
+            updateEngineAudioDynamics(currentY, currentX);
 
             propRotation += 35;
             propeller.setAttribute('rotation', `0 0 ${propRotation}`);
@@ -312,6 +324,60 @@
             if (timeLeft > 0) {
                 frameId = requestAnimationFrame(renderLoop);
             }
+        }
+
+        // GERÇEK ZAMANLI MOTOR SENTEZLEYİCİSİ KURULUMU
+        function initEngineSoundSimulator() {
+            if (!audioCtx) return;
+
+            // Düşük frekanslı testere dişi dalga formu (Pırpır motor silindir efekti için idealdir)
+            engineOsc = audioCtx.createOscillator();
+            engineOsc.type = 'sawtooth';
+            engineOsc.frequency.setValueAtTime(65, audioCtx.currentTime); // Temel rölanti frekansı
+
+            // Kulak tırmalamaması için alçak geçiren filtre (Low-pass)
+            engineFilter = audioCtx.createBiquadFilter();
+            engineFilter.type = 'lowpass';
+            engineFilter.frequency.setValueAtTime(160, audioCtx.currentTime);
+
+            // Ses seviye kontrolü
+            engineGain = audioCtx.createGain();
+            engineGain.gain.setValueAtTime(0.08, audioCtx.currentTime); // Dengeli zemin sesi
+
+            // Bağlantılar
+            engineOsc.connect(engineFilter);
+            engineFilter.connect(engineGain);
+            engineGain.connect(audioCtx.destination);
+
+            engineOsc.start();
+        }
+
+        // HAREKETE DUYARLI MOTOR DİNAMİKLERİNİ GÜNCELLEME
+        function updateEngineAudioDynamics(yPos, xPos) {
+            if (!engineOsc || !engineFilter || !engineGain) return;
+
+            // 1. İRTİFA ETKİSİ (yPos yukarı çıktıkça artar, aşağı indikçe azalır)
+            // Normal aralık yaklaşık -3.5 ile +5.0 arasıdır. Bunu normalize edip haritalandırıyoruz.
+            let pitchFactor = (yPos + 3.5) / 8.5; // 0 ile 1 arasına sıkıştır
+            pitchFactor = Math.max(0, Math.min(1, pitchFactor));
+
+            // Tırmanırken ses tizleşir (65Hz -> 95Hz), alçalırken pesleşir ve yavaşlar (65Hz -> 48Hz)
+            let targetFrequency = 48 + (pitchFactor * 47);
+            
+            // Dönüşlerde de motorun devrinin hafif dalgalanması efekti (Abs xPos etkisi)
+            let turnFactor = Math.abs(xPos) / 6.5;
+            targetFrequency += (turnFactor * 8); // Dönüşlerde ekstra zorlanma sesi
+
+            // Yumuşak geçişli ses değişimi (Giriş çıkışları kulak tırmalamaz)
+            engineOsc.frequency.setTargetAtTime(targetFrequency, audioCtx.currentTime, 0.1);
+
+            // Tırmanırken motor bağırır (Hacim artar), süzülürken gaz keser (Hacim azalır)
+            let targetVolume = 0.03 + (pitchFactor * 0.08) + (turnFactor * 0.02);
+            engineGain.gain.setTargetAtTime(targetVolume, audioCtx.currentTime, 0.15);
+
+            // Filtre frekansını da hacme paralel açıp kapatarak derinlik/boğukluk hissini veriyoruz
+            let targetFilterFreq = 110 + (pitchFactor * 100);
+            engineFilter.frequency.setTargetAtTime(targetFilterFreq, audioCtx.currentTime, 0.1);
         }
 
         let ringCounter = 0;
@@ -327,7 +393,6 @@
             let ring = document.createElement('a-torus');
             ring.setAttribute('id', `ring-${ringCounter++}`);
             
-            // İSTEK: Halkalar belirgin şekilde büyütüldü (0.65 -> 0.95, kalınlık 0.04 -> 0.06)
             ring.setAttribute('radius', '0.95'); 
             ring.setAttribute('radius-tubular', '0.06');
             ring.setAttribute('color', '#f43f5e'); 
@@ -355,15 +420,14 @@
                     let diffY = planePos.y - r.y;
                     let absoluteDistance = Math.sqrt(diffX*diffX + diffY*diffY);
 
-                    // Halka büyüdüğü için başarı alanı da toleranslı hale getirildi
                     if (absoluteDistance <= 1.1) { 
                         score++;
                         uiScore.textContent = score;
                         r.element.setAttribute('color', '#10b981'); 
-                        playZenSound(580, 'sine', 0.15); // Başarı ses efekti
+                        playZenSound(580, 'sine', 0.15); 
                     } else {
                         r.element.setAttribute('color', '#64748b'); 
-                        playZenSound(150, 'triangle', 0.12); // Kaçırma ses efekti
+                        playZenSound(150, 'triangle', 0.12); 
                     }
 
                     setTimeout(() => {
@@ -375,15 +439,13 @@
             }
         }
 
-        // SENTEZLENMİŞ ARKA PLAN ZEN MÜZİĞİ MOTORU (Ritmik & Rahatlatıcı)
         function startAmbientZenMusic() {
             let step = 0;
-            const notes = [220, 261.63, 293.66, 329.63, 392.00, 440]; // Pentatonik dinlendirici skala
+            const notes = [220, 261.63, 293.66, 329.63, 392.00, 440]; 
             
             ambientBpmInterval = setInterval(() => {
                 if (!audioCtx) return;
                 
-                // Yumuşak Melodi Katmanı
                 if (step % 2 === 0) {
                     let osc = audioCtx.createOscillator();
                     let gain = audioCtx.createGain();
@@ -391,32 +453,31 @@
                     gain.connect(audioCtx.destination);
                     
                     let currentNote = notes[Math.floor(Math.random() * notes.length)];
-                    osc.frequency.setValueAtTime(currentNote / 2, audioCtx.currentTime); // Bas/Meditatif tonlar
+                    osc.frequency.setValueAtTime(currentNote / 2, audioCtx.currentTime); 
                     osc.type = 'triangle';
                     
-                    gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+                    gain.gain.setValueAtTime(0.03, audioCtx.currentTime); // Motor sesiyle ezilmesin diye hafif kısıldı
                     gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1.8);
                     
                     osc.start();
                     osc.stop(audioCtx.currentTime + 1.8);
                 }
                 
-                // Hipnotik Altyapı Nabız Ritmi (Zen Metronomu)
                 if (step % 4 === 0) {
                     let subOsc = audioCtx.createOscillator();
                     let subGain = audioCtx.createGain();
                     subOsc.connect(subGain);
                     subGain.connect(audioCtx.destination);
-                    subOsc.frequency.setValueAtTime(73.42, audioCtx.currentTime); // Çok derinden gelen yumuşak vuruş
+                    subOsc.frequency.setValueAtTime(73.42, audioCtx.currentTime); 
                     subOsc.type = 'sine';
-                    subGain.gain.setValueAtTime(0.06, audioCtx.currentTime);
+                    subGain.gain.setValueAtTime(0.04, audioCtx.currentTime);
                     subGain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.4);
                     subOsc.start();
                     subOsc.stop(audioCtx.currentTime + 0.4);
                 }
 
                 step++;
-            }, 600); // 100 BPM dingin tempo
+            }, 600); 
         }
 
         function playZenSound(frequency, type, volume) {
@@ -438,7 +499,10 @@
             clearInterval(clockInterval);
             clearInterval(spawnInterval);
             clearInterval(ambientBpmInterval);
+            
+            if(engineOsc) { try { engineOsc.stop(); } catch(e){} }
             if (wakeLock) wakeLock.release();
+            
             alert(`Seans Tamamlandı.\nHalka Geçiş Skorunuz: ${score}`);
             location.reload();
         }
