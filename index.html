@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8">
+    <title>ZenFlow - Bio-Feedback Uçak Simülasyonu</title>
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&family=Azeret+Mono&display=swap" rel="stylesheet">
+    
+    <style>
+        /* KLİNİK COCKPIT UI */
+        :root {
+            --glass-bg: rgba(15, 23, 42, 0.6);
+            --glass-border: rgba(14, 165, 233, 0.3);
+            --sky-blue: #0ea5e9;
+        }
+
+        body { margin: 0; overflow: hidden; font-family: 'Poppins', sans-serif; background-color: #0b1329; }
+
+        #start-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(135deg, #0b1329 0%, #1d2d44 100%);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 9999; text-align: center;
+        }
+
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            width: 85%; max-width: 480px;
+            color: #f8fafc;
+        }
+
+        h2 { font-weight: 700; margin-top: 0; margin-bottom: 10px; color: #38bdf8; }
+        p { font-size: 13px; opacity: 0.8; margin-bottom: 25px; line-height: 1.5; }
+
+        .menu-group { margin: 18px 0; text-align: left; }
+        label { font-size: 12px; font-weight: 500; color: #94a3b8; }
+
+        select {
+            width: 100%; padding: 14px; font-size: 15px; border-radius: 12px;
+            border: 1px solid var(--glass-border); background: #0f172a;
+            color: #f8fafc; font-family: 'Poppins'; outline: none; margin-top: 6px;
+            font-weight: bold; cursor: pointer;
+        }
+
+        button {
+            width: 100%; padding: 18px; font-size: 18px; border: none;
+            border-radius: 14px; background: var(--sky-blue); color: white;
+            cursor: pointer; margin-top: 20px; font-weight: 700;
+            box-shadow: 0 0 20px rgba(14, 165, 233, 0.4); transition: all 0.3s;
+        }
+        button:hover { background: #0284c7; }
+
+        /* HUD PANELI */
+        #ui-overlay {
+            position: fixed; top: 20px; left: 20px;
+            background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(10px);
+            padding: 15px 25px; border-radius: 16px; border: 1px solid var(--glass-border);
+            color: #f8fafc; font-family: 'Azeret Mono', monospace; font-size: 15px;
+            z-index: 999; display: none; line-height: 1.6;
+        }
+        .highlight { color: #38bdf8; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div id="ui-overlay">
+        <div>SEANS SÜRESİ: <span id="ui-timer" class="highlight">03:00</span></div>
+        <div>BAŞARILI GEÇİŞ: <span id="ui-score" class="highlight">0</span></div>
+    </div>
+
+    <div id="start-screen">
+        <div class="glass-panel">
+            <h2>BOYUN MOBİLİTE UÇUŞU</h2>
+            <p>Servikal Lateral Fleksiyon Egzersizi<br>Başınızı sağa/sola yatırarak uçağı kontrol edin ve halkaların içinden geçin.</p>
+            
+            <div class="menu-group">
+                <label for="speed-select">Uçuş Hızı (Tempo)</label>
+                <select id="speed-select">
+                    <option value="12">Yavaş Akış (Isınma Seviyesi)</option>
+                    <option value="18" selected>Standart Klinik Akış</option>
+                    <option value="25">Hızlı Akış (Koordinasyon Odaklı)</option>
+                </select>
+            </div>
+
+            <div class="menu-group">
+                <label for="load-select">Parkur Yoğunluğu (Bilişsel Yük)</label>
+                <select id="load-select">
+                    <option value="2.5" selected>Geniş Aralıklı Halkalar</option>
+                    <option value="1.5">Sık Aralıklı Ardışık Halkalar</option>
+                </select>
+            </div>
+
+            <button id="start-btn">KOKPİTİ AKTİF ET</button>
+        </div>
+    </div>
+
+    <a-scene vr-mode-ui="enabled: false">
+        <a-sky color="#070a13"></a-sky>
+        <a-light type="ambient" color="#1d2d44" intensity="1.2"></a-light>
+        <a-light type="directional" position="0 10 -5" intensity="0.8" color="#38bdf8"></a-light>
+
+        <a-entity id="flight-core" position="0 0 0">
+            
+            <a-entity id="player-plane" position="0 0 -3" rotation="0 180 0">
+                <a-cone color="#38bdf8" radius-bottom="0.15" height="0.8" rotation="90 0 0"></a-cone>
+                <a-box color="#0284c7" width="1.2" height="0.02" depth="0.2" position="0.5 0 0" rotation="0 0 -10"></a-box>
+                <a-box color="#0284c7" width="1.2" height="0.02" depth="0.2" position="-0.5 0 0" rotation="0 0 10"></a-box>
+                <a-box color="#0ea5e9" width="0.02" height="0.25" depth="0.15" position="0 0.15 0.2"></a-box>
+                <a-cylinder color="#f43f5e" radius="0.06" height="0.02" position="0 0 0.4" rotation="90 0 0" material="emissive: #f43f5e; emissiveIntensity: 2"></a-cylinder>
+            </a-entity>
+
+            <a-entity camera position="0 0.6 0.5" look-controls="enabled: false"></a-entity>
+        </a-entity>
+
+        <a-entity id="course-container"></a-entity>
+
+        <a-grid width="20" height="500" position="0 -4 0" color="#1e293b" cell-color="#38bdf8" opacity="0.15"></a-grid>
+    </a-scene>
+
+    <script>
+        const startScreen = document.getElementById('start-screen');
+        const startBtn = document.getElementById('start-btn');
+        const uiOverlay = document.getElementById('ui-overlay');
+        const uiTimer = document.getElementById('ui-timer');
+        const uiScore = document.getElementById('ui-score');
+        const courseContainer = document.getElementById('course-container');
+        
+        const flightCore = document.getElementById('flight-core');
+        const playerPlane = document.getElementById('player-plane');
+
+        let score = 0;
+        let timeLeft = 180; // Net 3 Dakika Sınırı
+        let gameInterval, ringSpawnInterval, frameLoopId, wakeLock = null;
+        let sfx = null;
+
+        // Ayarlar
+        let flightSpeed = 0.18; // İleri doğru akış hızı
+        let ringSpawnFrequency = 2000; // Yeni halka gelme süresi (ms)
+        let planeTargetX = 0; // Uçağın kayması gereken hedef X pozisyonu
+        let currentPlaneX = 0; // Uçağın o anki gerçek X pozisyonu
+
+        startBtn.addEventListener('click', async () => {
+            const rawSpeed = parseInt(document.getElementById('speed-select').value);
+            flightSpeed = rawSpeed / 100;
+            
+            const rawFreq = parseFloat(document.getElementById('load-select').value);
+            ringSpawnFrequency = rawFreq * 1000;
+
+            try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
+
+            // Mobil Jiroskop İzin Talebi (iOS ve modern Android tarayıcılar için)
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission().then(permission => {
+                    if (permission === 'granted') startFlight();
+                }).catch(() => startFlight());
+            } else {
+                startFlight();
+            }
+        });
+
+        function startFlight() {
+            startScreen.style.display = 'none';
+            uiOverlay.style.display = 'block';
+            sfx = new (window.AudioContext || window.webkitAudioContext)();
+
+            // CİHAZ HAREKETLERİNİ (BAŞ TİLTİNİ) DİNLEME MOTORU
+            window.addEventListener('deviceorientation', handleBioFeedbackRotation);
+
+            // Masaüstü testleri için klavye alternatifi (A-D Tuşları boyun tilti taklidi yapar)
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'a' || e.key === 'A') processTiltAction(-25);
+                if (e.key === 'd' || e.key === 'D') processTiltAction(25);
+            });
+            window.addEventListener('keyup', () => processTiltAction(0));
+
+            // Ana İleri Akış ve Güncelleme Döngüsü
+            frameLoopId = requestAnimationFrame(updateFlightFrame);
+
+            // 3 Dakika Geri Sayım Zamanlayıcısı
+            gameInterval = setInterval(() => {
+                timeLeft--;
+                let m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
+                let s = (timeLeft % 60).toString().padStart(2, '0');
+                uiTimer.textContent = `${m}:${s}`;
+
+                if (timeLeft <= 0) endFlightSession();
+            }, 1000);
+
+            // Parkur Halkası Üretim Döngüsü
+            generateTrackRing();
+            ringSpawnInterval = setInterval(generateTrackRing, ringSpawnFrequency);
+        }
+
+        // BAF FİZİKSEL TİLT HESAPLAMA VE FİLTRELEME
+        function handleBioFeedbackRotation(event) {
+            // Cihaz dikey tutulurken "gamma" veya "beta" başın sağa/sola yatma açısını verir
+            let tiltAngle = event.gamma; 
+            
+            // Cihaz yönelimine göre oryantasyon düzeltmesi
+            if (window.orientation === 90) tiltAngle = event.beta;
+            if (window.orientation === -90) tiltAngle = -event.beta;
+
+            if (tiltAngle !== null) {
+                processTiltAction(tiltAngle);
+            }
+        }
+
+        function processTiltAction(angle) {
+            // Parkinson hastalarında ince titreşimleri bastırmak için dead-zone (ölü bölge) filtresi
+            if (Math.abs(angle) < 4) {
+                planeTargetX = currentPlaneX; // Pozisyonu koru
+                playerPlane.setAttribute('rotation', '0 180 0'); // Uçağı düzelt
+                return;
+            }
+
+            // Güvenli maksimum sınır filtresi (Klinik boyun zorlamasını önlemek için 30 derece limit)
+            let clampedAngle = Math.max(-30, Math.min(30, angle));
+
+            // Baş yatırma miktarına göre uçağı ekranda sağa/sola hedefle (Maksimum 2.5 metre açılma)
+            planeTargetX = (clampedAngle / 30) * 2.5;
+
+            // Görsel Bio-feedback: Uçağı yatış yönüne doğru pürüzsüzce yuvarla (Bank Angle)
+            playerPlane.setAttribute('rotation', `0 180 ${-clampedAngle * 1.2}`);
+        }
+
+        // ANA GÜNCELLEME DÖNGÜSÜ (FORWARD MOTION & SMOOTH INTERPOLATION)
+        function updateFlightFrame() {
+            // Uçağı ve Kamerayı durmaksızın ileri (Z ekseninde derine) yürüt
+            let currentPos = flightCore.getAttribute('position');
+            currentPos.z -= flightSpeed;
+
+            // Uçağın sağa sola kayış hareketini yumuşat (Damping/Lerp filtresi ile sarsıntısız motor kontrolü)
+            currentPlaneX += (planeTargetX - currentPlaneX) * 0.12;
+            currentPos.x = currentPlaneX;
+
+            flightCore.setAttribute('position', currentPos);
+
+            // Parkurdaki halkalarla uçağın mesafesini ölç (Çarpışma/Geçiş Testi)
+            evaluateRingCollisions(currentPos);
+
+            if (timeLeft > 0) {
+                frameLoopId = requestAnimationFrame(updateFlightFrame);
+            }
+        }
+
+        // REHABİLİTASYON PARKUR HALKASI ÜRETİCİSİ
+        let ringIdCounter = 0;
+        const activeRings = [];
+
+        function generateTrackRing() {
+            let currentCorePos = flightCore.getAttribute('position');
+            
+            // Halkaları uçağın 40-50 metre ilerisine, rastgele sağ veya sola yerleştir
+            // Böylece hasta bir sonraki halkayı görüp boyun tiltini önceden planlar (Yönetici İşlev)
+            let spawnZ = currentCorePos.z - 45;
+            let spawnX = (Math.random() - 0.5) * 4.4; // -2.2 ile +2.2 arası
+
+            let ring = document.createElement('a-torus');
+            ring.setAttribute('id', `ring-${ringIdCounter++}`);
+            ring.setAttribute('radius', '0.45');
+            ring.setAttribute('radius-tubular', '0.03');
+            ring.setAttribute('color', '#38bdf8');
+            ring.setAttribute('material', 'emissive: #38bdf8; emissiveIntensity: 1');
+            ring.setAttribute('position', `${spawnX} 0 ${spawnZ}`);
+            
+            courseContainer.appendChild(ring);
+
+            // Aktif takip listesine ekle
+            activeRings.push({
+                element: ring,
+                x: spawnX,
+                z: spawnZ,
+                evaluated: false
+            });
+        }
+
+        // GEÇİŞ DOĞRULAMA VE GERİ BİLDİRİM MOTORU
+        function evaluateRingCollisions(planePos) {
+            for (let i = activeRings.length - 1; i >= 0; i--) {
+                let ring = activeRings[i];
+
+                // Uçak halkanın hizasına veya arkasına geçti mi? (Z ekseni kontrolü)
+                if (!ring.evaluated && planePos.z <= ring.z) {
+                    ring.evaluated = true;
+
+                    // X eksenindeki koordinat farkını ölç (Halkanın içinden geçebildi mi?)
+                    let distanceX = Math.abs(planePos.x - ring.x);
+
+                    if (distanceX <= 0.55) { // Başarılı geçiş toleransı
+                        score++;
+                        uiScore.textContent = score;
+                        ring.element.setAttribute('color', '#4ade80'); // Halkayı yeşile döndür (Pozitif Feedback)
+                        ring.element.setAttribute('material', 'emissive: #4ade80');
+                        playTone(600, 'sine', 0.15); // Başarı sesi
+                    } else {
+                        ring.element.setAttribute('color', '#f43f5e'); // Kaçırılan halkayı kırmızıya döndür
+                        ring.element.setAttribute('material', 'emissive: #f43f5e');
+                        playTone(180, 'sawtooth', 0.2); // Hata sesi
+                    }
+
+                    // Performans optimizasyonu için arkada kalan halkaları 2 saniye sonra dünyadan tamamen sil
+                    setTimeout(() => {
+                        if (ring.element.parentNode) ring.element.parentNode.removeChild(ring.element);
+                        let index = activeRings.indexOf(ring);
+                        if (index > -1) activeRings.splice(index, 1);
+                    }, 2000);
+                }
+            }
+        }
+
+        function playTone(freq, type, duration) {
+            if (!sfx) return;
+            let osc = sfx.createOscillator();
+            let gain = sfx.createGain();
+            osc.connect(gain);
+            gain.connect(sfx.destination);
+            osc.frequency.setValueAtTime(freq, sfx.currentTime);
+            osc.type = type;
+            gain.gain.setValueAtTime(0.15, sfx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, sfx.currentTime + duration);
+            osc.start();
+            osc.stop(sfx.currentTime + duration);
+        }
+
+        function endFlightSession() {
+            cancelAnimationFrame(frameLoopId);
+            clearInterval(gameInterval);
+            clearInterval(ringSpawnInterval);
+            window.removeEventListener('deviceorientation', handleBioFeedbackRotation);
+            if (wakeLock) wakeLock.release();
+            alert(`3 Dakikalık Boyun Mobilizasyon Seansı Tamamlandı!\nHalka Geçiş Skorunuz: ${score}`);
+            location.reload();
+        }
+    </script>
+</body>
+</html>
