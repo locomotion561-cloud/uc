@@ -2,12 +2,11 @@
 <html lang="tr">
 <head>
     <meta charset="utf-8">
-    <title>ZenFlow - 3D Pırpır Uçak Rehabilitasyonu</title>
+    <title>ZenFlow - 3D Pırpır Uçak (Doğru Kamera)</title>
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&family=Azeret+Mono&display=swap" rel="stylesheet">
     
     <style>
-        /* ZEN MORPHISM GİRİŞ MENÜSÜ */
         :root {
             --glass-bg: rgba(255, 255, 255, 0.3);
             --glass-border: rgba(255, 255, 255, 0.5);
@@ -57,7 +56,6 @@
         }
         button:hover { background: #5a7567; }
 
-        /* HUD PANELİ */
         #ui-overlay {
             position: fixed; top: 20px; left: 20px;
             background: rgba(255, 255, 255, 0.5); backdrop-filter: blur(10px);
@@ -108,24 +106,24 @@
 
         <a-entity id="flight-core" position="0 0 0">
             
-            <a-entity id="player-plane" position="0 -0.2 -3" rotation="0 180 0">
+            <a-entity id="player-plane" position="0 -0.2 -3" rotation="0 0 0">
                 <a-cylinder color="#c29a76" radius="0.15" height="0.9" rotation="90 0 0"></a-cylinder>
                 
-                <a-box color="#6d8c7c" width="1.6" height="0.02" depth="0.22" position="0 0.22 -0.1"></a-box>
-                <a-box color="#6d8c7c" width="1.6" height="0.02" depth="0.22" position="0 -0.15 -0.1"></a-box>
-                <a-cylinder color="#4a4238" radius="0.01" height="0.37" position="0.7 0.03 -0.1"></a-cylinder>
-                <a-cylinder color="#4a4238" radius="0.01" height="0.37" position="-0.7 0.03 -0.1"></a-cylinder>
+                <a-box color="#6d8c7c" width="1.6" height="0.02" depth="0.22" position="0 0.22 0.1"></a-box>
+                <a-box color="#6d8c7c" width="1.6" height="0.02" depth="0.22" position="0 -0.15 0.1"></a-box>
+                <a-cylinder color="#4a4238" radius="0.01" height="0.37" position="0.7 0.03 0.1"></a-cylinder>
+                <a-cylinder color="#4a4238" radius="0.01" height="0.37" position="-0.7 0.03 0.1"></a-cylinder>
                 
                 <a-box color="#5a7567" width="0.02" height="0.3" depth="0.2" position="0 0.18 0.35"></a-box>
                 <a-box color="#6d8c7c" width="0.5" height="0.02" depth="0.12" position="0 0.1 0.35"></a-box>
 
-                <a-cone color="#4a4238" radius-bottom="0.15" radius-top="0.05" height="0.15" position="0 0 -0.5" rotation="90 0 0"></a-cone>
-                <a-entity id="propeller" position="0 0 -0.58">
+                <a-cone color="#4a4238" radius-bottom="0.15" radius-top="0.05" height="0.15" position="0 0 -0.45" rotation="90 0 0"></a-cone>
+                <a-entity id="propeller" position="0 0 -0.53">
                     <a-box color="#1a1a1a" width="0.7" height="0.04" depth="0.01"></a-box>
                 </a-entity>
             </a-entity>
 
-            <a-entity camera position="0 0.6 0.6" look-controls="enabled: false"></a-entity>
+            <a-entity camera position="0 0.4 0.6" look-controls="enabled: false"></a-entity>
         </a-entity>
 
         <a-entity id="course-container"></a-entity>
@@ -147,21 +145,18 @@
         const propeller = document.getElementById('propeller');
 
         let score = 0;
-        let timeLeft = 180; // Tam 3 Dakika
+        let timeLeft = 180; 
         let clockInterval, spawnInterval, frameId, wakeLock = null;
         let audioCtx = null;
 
-        // Klinik Ayarlar
         let forwardSpeed = 0.16; 
         let ringFrequency = 2400; 
         
-        // Dinamik Pozisyon Matrisleri
         let targetX = 0; 
         let targetY = 0;
         let currentX = 0;
         let currentY = 0;
 
-        // Dekorasyon için pastel Zen ağaç elemanları oluştur
         for(let i=0; i<40; i++) {
             let side = i % 2 === 0 ? 1 : -1;
             let tree = document.createElement('a-cone');
@@ -192,14 +187,12 @@
             uiOverlay.style.display = 'block';
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-            // Gelişmiş Jiroskop Takipçisi (Hem Sağa/Sola Tilt hem Yukarı/Aşağı Pitch algılar)
             window.addEventListener('deviceorientation', processBioFeedbackSensors);
 
-            // Masaüstü Testleri İçin Klavye Desteği (Yön Tuşları)
             window.addEventListener('keydown', (e) => {
-                if (e.key === 'ArrowLeft') targetX = -3.5;
-                if (e.key === 'ArrowRight') targetX = 3.5;
-                if (e.key === 'ArrowUp') targetY = 2.2;
+                if (e.key === 'ArrowLeft') targetX = -3.8;
+                if (e.key === 'ArrowRight') targetX = 3.8;
+                if (e.key === 'ArrowUp') targetY = 2.5;
                 if (e.key === 'ArrowDown') targetY = -1.8;
             });
             window.addEventListener('keyup', () => { targetX = currentX; targetY = currentY; });
@@ -218,44 +211,33 @@
             spawnInterval = setInterval(generateNextRing, ringFrequency);
         }
 
-        // TAM SERVİKAL KONTROL MOTORU (3 BOYUTLU HAREKET)
         function processBioFeedbackSensors(event) {
-            // 1. Sağa/Sola Tilt (Gamma): Uçağın sağa sola kaymasını sağlar
             let rawTilt = event.gamma; 
             if (window.orientation === 90) rawTilt = event.beta;
             if (window.orientation === -90) rawTilt = -event.beta;
 
-            // 2. Yukarı/Aşağı Eğme (Beta): Uçağın yükselip alçalmasını sağlar
             let rawPitch = event.beta; 
 
-            // HAREKET ARALIĞI (RANGE) İYİLEŞTİRMESİ
-            // Hastanın boynunu fazla zorlamaması için çarpanları artırdım (Hassasiyet yükseltildi)
             if (rawTilt !== null && rawPitch !== null) {
-                // Ölü bölge kontrolü (Küçük istemsiz titremeleri absorbe eder)
                 if (Math.abs(rawTilt) < 3) rawTilt = 0;
-                if (Math.abs(rawPitch - 45) < 3) rawPitch = 45; // 45 derece telefonu dik tutma ortalamasıdır
+                if (Math.abs(rawPitch - 45) < 3) rawPitch = 45; 
 
-                // Klinikte test edilmiş maksimum limit esnekliği
                 let clampedTilt = Math.max(-25, Math.min(25, rawTilt));
-                let clampedPitch = Math.max(20, Math.min(70, rawPitch)) - 45; // Merkeze göre hizalama
+                let clampedPitch = Math.max(20, Math.min(70, rawPitch)) - 45; 
 
-                // YENİ RANGE HESABI: Artık uçak ekranın en dış noktalarına rahatça ulaşabilir
                 targetX = (clampedTilt / 25) * 3.8; 
-                targetY = (-clampedPitch / 25) * 2.5; // Eksi yön yukarı kalkışı simüle eder
+                targetY = (-clampedPitch / 25) * 2.5; 
 
-                // Pırpır uçağa yatış efekti ver
-                playerPlane.setAttribute('rotation', `0 180 ${-clampedTilt * 1.4}`);
+                // Uçak ileri baktığı için, yatış açısı (Z ekseni rotasyonu) yönünü düzeltttim
+                playerPlane.setAttribute('rotation', `0 0 ${-clampedTilt * 1.4}`);
             }
         }
 
-        // RENDER VE FİZİK DÖNGÜSÜ
         let propRotation = 0;
         function renderLoop() {
-            // 1. Sürekli İleri Gitme Hareketi
             let corePos = flightCore.getAttribute('position');
             corePos.z -= forwardSpeed;
 
-            // 2. Yumuşatılmış Pozisyon Yaklaşımı (Lerp Damping - Titreşim Önleyici)
             currentX += (targetX - currentX) * 0.15;
             currentY += (targetY - currentY) * 0.15;
             
@@ -263,11 +245,9 @@
             corePos.y = currentY;
             flightCore.setAttribute('position', corePos);
 
-            // 3. Pervaneyi Döndür (Pırpır Uçak Hissiyatı)
             propRotation += 25;
             propeller.setAttribute('rotation', `0 0 ${propRotation}`);
 
-            // Halkalarla olan teması ölç
             detectRingPass(corePos);
 
             if (timeLeft > 0) {
@@ -275,23 +255,21 @@
             }
         }
 
-        // 3D UZAYDA RASTGELE HALKA ÜRETİCİSİ
         let ringCounter = 0;
         const activeRings = [];
 
         function generateNextRing() {
             let corePos = flightCore.getAttribute('position');
-            let spawnZ = corePos.z - 45; // Uçağın 45 metre ilerisinde doğar
+            let spawnZ = corePos.z - 45; 
 
-            // Genişletilmiş yeni range'e uygun olarak halkalar hem X hem Y ekseninde dağılır
-            let spawnX = (Math.random() - 0.5) * 6;  // -3.0 ile +3.0 arası geniş yatay alan
-            let spawnY = (Math.random() - 0.5) * 3.6; // -1.8 ile +1.8 arası geniş dikey alan
+            let spawnX = (Math.random() - 0.5) * 6;  
+            let spawnY = (Math.random() - 0.5) * 3.6; 
 
             let ring = document.createElement('a-torus');
             ring.setAttribute('id', `ring-${ringCounter++}`);
-            ring.setAttribute('radius', '0.5'); // Geçişi kolaylaştırmak adına halka çapı hafif büyütüldü
+            ring.setAttribute('radius', '0.5'); 
             ring.setAttribute('radius-tubular', '0.03');
-            ring.setAttribute('color', '#dc2626'); // Soft kırmızı/mercan zen rengi başlangıç
+            ring.setAttribute('color', '#dc2626'); 
             ring.setAttribute('position', `${spawnX} ${spawnY} ${spawnZ}`);
             
             courseContainer.appendChild(ring);
@@ -305,7 +283,6 @@
             });
         }
 
-        // 3 BOYUTLU TEMAS DENETİMİ
         function detectRingPass(planePos) {
             for (let i = activeRings.length - 1; i >= 0; i--) {
                 let r = activeRings[i];
@@ -313,22 +290,20 @@
                 if (!r.checked && planePos.z <= r.z) {
                     r.checked = true;
 
-                    // Hem X hem Y eksenindeki sapma payını hesapla (Öklid mesafesi)
                     let diffX = planePos.x - r.x;
                     let diffY = planePos.y - r.y;
                     let absoluteDistance = Math.sqrt(diffX*diffX + diffY*diffY);
 
-                    if (absoluteDistance <= 0.65) { // Başarılı geçiş limiti
+                    if (absoluteDistance <= 0.65) { 
                         score++;
                         uiScore.textContent = score;
-                        r.element.setAttribute('color', '#16a34a'); // Zen Yeşili onay rengi
+                        r.element.setAttribute('color', '#16a34a'); 
                         playZenSound(550, 'sine');
                     } else {
-                        r.element.setAttribute('color', '#94a3b8'); // Soft Gri kaçırma rengi
+                        r.element.setAttribute('color', '#94a3b8'); 
                         playZenSound(160, 'triangle');
                     }
 
-                    // Arkada kalan halkaları temizle
                     setTimeout(() => {
                         if (r.element.parentNode) r.element.parentNode.removeChild(r.element);
                         let idx = activeRings.indexOf(r);
