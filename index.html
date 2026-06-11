@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
     <meta charset="utf-8">
-    <title>ZenFlow - Dinamik Motor Sesli Uçuş Seansı</title>
+    <title>ZenFlow - Otoban ve Trafik Akışlı Uçuş Seansı</title>
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&family=Azeret+Mono&display=swap" rel="stylesheet">
     
@@ -76,7 +76,7 @@
     <div id="start-screen">
         <div class="glass-panel">
             <h2>ZEN VADİSİ UÇUŞU v4</h2>
-            <p>Dinamik Motor Sesli ve Süzülen Kontrol Motoru<br>Uçağın irtifa değişimleri ve dönüşleri, gerçek zamanlı akustik ses motoruyla kulaklarınıza yansıtılır.</p>
+            <p>Dinamik Motor Sesli, Süzülen Kontrol Motoru ve Canlı Otoban Trafiği<br>Uçağın irtifa değişimleri ve dönüşleri, akustik ses motoruyla kulaklarınıza yansıtılırken, aşağıdaki otobanda akan trafiği ve olayları izleyin.</p>
             
             <div class="menu-group">
                 <label for="speed-select">Uçuş Hızı</label>
@@ -141,9 +141,14 @@
             <a-entity id="left-hills"></a-entity>
             <a-entity id="right-hills"></a-entity>
             
-            <a-plane id="zen-river" position="0 -5.5 0" rotation="-90 0 0" width="10" height="1500" color="#38bdf8" opacity="0.9" material="roughness: 0.1; metalness: 0.2"></a-plane>
-            <a-plane id="river-core" position="0 -5.48 0" rotation="-90 0 0" width="4" height="1500" color="#0ea5e9" opacity="0.7"></a-plane>
-            <a-plane position="0 -5.52 0" rotation="-90 0 0" width="14" height="1500" color="#cbd5e1"></a-plane>
+            <a-plane id="highway" position="0 -5.5 0" rotation="-90 0 0" width="14" height="1500" color="#334155" material="roughness: 0.8; metalness: 0.1">
+                <a-plane position="-3.5 0 0.01" width="0.2" height="1500" color="#FFFFFF" opacity="0.8"></a-plane>
+                <a-plane position="0 0 0.01" width="0.2" height="1500" color="#FFFFFF" opacity="0.8"></a-plane>
+                <a-plane position="3.5 0 0.01" width="0.2" height="1500" color="#FFFFFF" opacity="0.8"></a-plane>
+                
+                <a-entity id="traffic-container"></a-entity>
+            </a-plane>
+            <a-plane position="0 -5.52 0" rotation="-90 0 0" width="16" height="1500" color="#94a3b8"></a-plane>
         </a-entity>
     </a-scene>
 
@@ -156,8 +161,8 @@
         const courseContainer = document.getElementById('course-container');
         const leftHills = document.getElementById('left-hills');
         const rightHills = document.getElementById('right-hills');
-        const zenRiver = document.getElementById('zen-river');
-        const riverCore = document.getElementById('river-core');
+        const highway = document.getElementById('highway');
+        const trafficContainer = document.getElementById('traffic-container');
         
         const flightCore = document.getElementById('flight-core');
         const playerPlane = document.getElementById('player-plane');
@@ -239,6 +244,9 @@
             // SESLERİ BAŞLAT
             startAmbientZenMusic();
             initEngineSoundSimulator();
+            
+            // TRAFİK ÜRETİMİNİ BAŞLAT
+            initTrafficSimulation();
 
             window.addEventListener('deviceorientation', processBioFeedbackSensors);
 
@@ -294,13 +302,13 @@
             let corePos = flightCore.getAttribute('position');
             corePos.z -= forwardSpeed;
 
-            let rPos = zenRiver.getAttribute('position');
+            // Otoban takibi (Sonsuz akış görünümü)
+            let rPos = highway.getAttribute('position');
             rPos.z = corePos.z;
-            zenRiver.setAttribute('position', rPos);
+            highway.setAttribute('position', rPos);
             
-            let rcPos = riverCore.getAttribute('position');
-            rcPos.z = corePos.z;
-            riverCore.setAttribute('position', rcPos);
+            // TRAFİK GÜNCELLEME MOTORU (Araçların hareketi ve olaylar)
+            updateTrafficSimulation(corePos);
 
             // Akışkan süzülme takibi (0.05)
             currentX += (targetX - currentX) * 0.05;
@@ -380,6 +388,105 @@
             engineFilter.frequency.setTargetAtTime(targetFilterFreq, audioCtx.currentTime, 0.1);
         }
 
+        // TRAFİK SİMÜLASYONU VE OLAYLAR MOTORU
+        const vehicles = [];
+        const laneX = [-5.25, -1.75, 1.75, 5.25];
+        const vehicleColors = ['#F44336', '#2196F3', '#4CAF50', '#FFEB3B', '#9C27B0', '#FF9800'];
+        let trafficSpawnInterval;
+
+        function initTrafficSimulation() {
+            // Başlangıç araçlarını oluştur
+            for (let i = 0; i < 30; i++) {
+                spawnVehicle(-i * 40 - 50);
+            }
+            // Düzenli araç üretimi (Otoban akışı için)
+            trafficSpawnInterval = setInterval(() => {
+                if (timeLeft > 0) spawnVehicle(flightCore.getAttribute('position').z - 1200);
+            }, 800);
+        }
+
+        function spawnVehicle(zPos) {
+            let vehicle = document.createElement('a-box');
+            let type = Math.random();
+            let width, height, depth;
+
+            // Araç Tipi Belirleme (Otomobil, Kamyon)
+            if (type < 0.8) { // Otomobil
+                width = 1.8; height = 1.2; depth = 3.5;
+                vehicle.setAttribute('color', vehicleColors[Math.floor(Math.random() * vehicleColors.colorsCount)]);
+            } else { // Kamyon/TIR
+                width = 2.4; height = 3.0; depth = 10.0;
+                vehicle.setAttribute('color', '#78909C'); // Kamyon rengi
+            }
+
+            vehicle.setAttribute('width', width);
+            vehicle.setAttribute('height', height);
+            vehicle.setAttribute('depth', depth);
+            
+            let lane = Math.floor(Math.random() * 4);
+            // Yüksekliği otoban düzlemine (y=-5.5) göre ayarla (Araç yüksekliğinin yarısı kadar yukarı)
+            let yPos = (height / 2) + 0.05; // Otobanın hemen üzerinde
+            vehicle.setAttribute('position', `${laneX[lane]} ${yPos} ${zPos}`);
+            vehicle.setAttribute('material', 'roughness', '0.7');
+
+            // Hız ve Olay Belirleme
+            let event = Math.random();
+            let speed;
+            let status = 'normal';
+
+            if (event < 0.7) { // Normal Akan Trafik
+                speed = 1.5 + (Math.random() * 0.8);
+            } else if (event < 0.85) { // Sıkışık Trafik (Yavaş Araçlar)
+                speed = 0.3 + (Math.random() * 0.3);
+                status = 'jammed';
+                vehicle.setAttribute('color', '#A1887F'); // Sıkışık trafik araç rengi
+            } else { // Kaza Olayı (Durmuş Araçlar ve Kaza Belirtileri)
+                speed = 0;
+                status = 'accident';
+                vehicle.setAttribute('color', '#E57373'); // Kaza yapmış araç rengi
+                vehicle.setAttribute('rotation', '0 25 0'); // Kaza yapmış gibi hafif dönük
+                
+                // Kaza Belirtisi: Küçük "duman" veya "yangın" efekti (Basit)
+                if (Math.random() < 0.5) {
+                    let smoke = document.createElement('a-cylinder');
+                    smoke.setAttribute('radius', '0.3');
+                    smoke.setAttribute('height', '2');
+                    smoke.setAttribute('color', '#616161'); // Duman rengi
+                    smoke.setAttribute('opacity', '0.6');
+                    smoke.setAttribute('position', '0 1.5 0'); // Aracın üzerinden yükselen duman
+                    vehicle.appendChild(smoke);
+                }
+            }
+
+            trafficContainer.appendChild(vehicle);
+
+            vehicles.push({
+                element: vehicle,
+                speed: speed,
+                status: status,
+                zPos: zPos,
+                type: type < 0.8 ? 'car' : 'truck'
+            });
+        }
+
+        function updateTrafficSimulation(planePos) {
+            for (let i = vehicles.length - 1; i >= 0; i--) {
+                let v = vehicles[i];
+
+                // Araçları hareket ettir (Kazalar durur)
+                v.zPos -= v.speed;
+                let currentPos = v.element.getAttribute('position');
+                currentPos.z = v.zPos;
+                v.element.setAttribute('position', currentPos);
+
+                // Arkada kalan araçları temizle
+                if (v.zPos > planePos.z + 50) {
+                    if (v.element.parentNode) v.element.parentNode.removeChild(v.element);
+                    vehicles.splice(i, 1);
+                }
+            }
+        }
+
         let ringCounter = 0;
         const activeRings = [];
 
@@ -456,7 +563,7 @@
                     osc.frequency.setValueAtTime(currentNote / 2, audioCtx.currentTime); 
                     osc.type = 'triangle';
                     
-                    gain.gain.setValueAtTime(0.03, audioCtx.currentTime); // Motor sesiyle ezilmesin diye hafif kısıldı
+                    gain.gain.setValueAtTime(0.03, audioCtx.currentTime); 
                     gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1.8);
                     
                     osc.start();
@@ -499,6 +606,7 @@
             clearInterval(clockInterval);
             clearInterval(spawnInterval);
             clearInterval(ambientBpmInterval);
+            clearInterval(trafficSpawnInterval); // Trafik üretimini durdur
             
             if(engineOsc) { try { engineOsc.stop(); } catch(e){} }
             if (wakeLock) wakeLock.release();
