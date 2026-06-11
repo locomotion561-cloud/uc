@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
     <meta charset="utf-8">
-    <title>ZenFlow - Tam Doğrulanmış Kontrollü Pırpır Uçuşu</title>
+    <title>ZenFlow - Kalibrasyonsuz Estetik Uçuş Seansı</title>
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&family=Azeret+Mono&display=swap" rel="stylesheet">
     
@@ -75,8 +75,8 @@
 
     <div id="start-screen">
         <div class="glass-panel">
-            <h2>ZEN VADİSİ UÇUŞU</h2>
-            <p>Eksenleri Düzeltilmiş Mobilizasyon Seansı<br>Karşıya bakarak başlayın. Baş yukarı -> Uçak Yukarı. Baş aşağı -> Uçak Aşağı.</p>
+            <h2>ZEN VADİSİ UÇUŞU v2</h2>
+            <p>Sabit Dik Eksenli Rehabilitasyon Seansı<br>Telefonun tam dik (90°) durduğu pozisyon merkezdir. Arka plan müziği eşliğinde büyük halkaları hedefleyin.</p>
             
             <div class="menu-group">
                 <label for="speed-select">Uçuş Hızı</label>
@@ -91,11 +91,11 @@
                 <label for="load-select">Halka Sıklığı</label>
                 <select id="load-select">
                     <option value="2.2" selected>Geniş Aralıklı</option>
-                    <option value="1.5">Sık Aralıklı (Yoğun)</option>
+                    <option value="1.5">Sık Aralıklı</option>
                 </select>
             </div>
 
-            <button id="start-btn">KALİBRE ET VE SEANSI BAŞLAT</button>
+            <button id="start-btn">MÜZİKLİ SEANSI BAŞLAT</button>
         </div>
     </div>
 
@@ -140,8 +140,10 @@
         <a-entity id="terrain-environment">
             <a-entity id="left-hills"></a-entity>
             <a-entity id="right-hills"></a-entity>
-            <a-plane id="zen-river" position="0 -5.5 0" rotation="-90 0 0" width="12" height="1500" color="#93c5fd" opacity="0.85" material="roughness: 0.2; metalness: 0.1"></a-plane>
-            <a-plane position="0 -5.52 0" rotation="-90 0 0" width="16" height="1500" color="#e2e8f0"></a-plane>
+            
+            <a-plane id="zen-river" position="0 -5.5 0" rotation="-90 0 0" width="10" height="1500" color="#38bdf8" opacity="0.9" material="roughness: 0.1; metalness: 0.2"></a-plane>
+            <a-plane id="river-core" position="0 -5.48 0" rotation="-90 0 0" width="4" height="1500" color="#0ea5e9" opacity="0.7"></a-plane>
+            <a-plane position="0 -5.52 0" rotation="-90 0 0" width="14" height="1500" color="#cbd5e1"></a-plane>
         </a-entity>
     </a-scene>
 
@@ -155,6 +157,7 @@
         const leftHills = document.getElementById('left-hills');
         const rightHills = document.getElementById('right-hills');
         const zenRiver = document.getElementById('zen-river');
+        const riverCore = document.getElementById('river-core');
         
         const flightCore = document.getElementById('flight-core');
         const playerPlane = document.getElementById('player-plane');
@@ -163,7 +166,10 @@
         let score = 0;
         let timeLeft = 180; 
         let clockInterval, spawnInterval, frameId, wakeLock = null;
+        
+        // SES MOTORU DEĞİŞKENLERİ
         let audioCtx = null;
+        let ambientBpmInterval = null;
 
         let forwardSpeed = 0.17; 
         let ringFrequency = 2200; 
@@ -173,10 +179,7 @@
         let currentX = 0;
         let currentY = 0;
 
-        let baseTilt = null;
-        let basePitch = null;
-        let isCalibrated = false;
-
+        // Vadi İnşası
         for(let i=0; i<60; i++) {
             let currentZ = -i * 25;
             
@@ -184,7 +187,7 @@
             lHill.setAttribute('color', '#a7f3d0');
             lHill.setAttribute('radius-bottom', '8');
             lHill.setAttribute('height', '9');
-            lHill.setAttribute('position', `${-14 - (Math.random()*4)} -5.0 ${currentZ}`);
+            lHill.setAttribute('position', `${-13 - (Math.random()*4)} -5.0 ${currentZ}`);
             leftHills.appendChild(lHill);
 
             let rHill = document.createElement('a-cone');
@@ -196,10 +199,10 @@
 
             if (i % 2 === 0) {
                 let rock = document.createElement('a-dodecahedron');
-                rock.setAttribute('color', '#cbd5e1');
-                rock.setAttribute('radius', '0.8');
-                let sideX = i % 4 === 0 ? -6.5 : 6.5;
-                rock.setAttribute('position', `${sideX} -5.2 ${currentZ + 5}`);
+                rock.setAttribute('color', '#94a3b8');
+                rock.setAttribute('radius', '0.9');
+                let sideX = i % 4 === 0 ? -6.0 : 6.0;
+                rock.setAttribute('position', `${sideX} -5.1 ${currentZ + 5}`);
                 courseContainer.appendChild(rock);
             }
         }
@@ -222,16 +225,18 @@
         function startZenFlight() {
             startScreen.style.display = 'none';
             uiOverlay.style.display = 'block';
+            
+            // Web Audio API Başlatma ve Ortam Müziği Motoru
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            startAmbientZenMusic();
 
             window.addEventListener('deviceorientation', processBioFeedbackSensors);
 
-            // Klavye Test Yönleri Senkronizasyonu
             window.addEventListener('keydown', (e) => {
                 if (e.key === 'ArrowLeft') targetX = -6.5; 
                 if (e.key === 'ArrowRight') targetX = 6.5;
-                if (e.key === 'ArrowUp') targetY = 5.0; // Klavye yukarı -> Uçak Yukarı
-                if (e.key === 'ArrowDown') targetY = -3.5; // Klavye aşağı -> Uçak Aşağı
+                if (e.key === 'ArrowUp') targetY = 5.0; 
+                if (e.key === 'ArrowDown') targetY = -3.5; 
             });
             window.addEventListener('keyup', () => { targetX = currentX; targetY = currentY; });
 
@@ -249,7 +254,7 @@
             spawnInterval = setInterval(generateNextRing, ringFrequency);
         }
 
-        // DÜZELTİLMİŞ VE YÖNLERİ DOĞRULANMIŞ SENSÖR MOTORU
+        // TAMAMEN KALİBRASYONSUZ SABİT DİK EKSEN MOTORU
         function processBioFeedbackSensors(event) {
             let rawTilt = event.gamma; 
             if (window.orientation === 90) rawTilt = event.beta;
@@ -258,27 +263,22 @@
 
             if (rawTilt === null || rawPitch === null) return;
 
-            if (!isCalibrated) {
-                baseTilt = rawTilt;
-                basePitch = rawPitch;
-                isCalibrated = true;
-                return;
-            }
-
-            let deltaTilt = rawTilt - baseTilt;
-            let deltaPitch = rawPitch - basePitch;
+            // Klinik Kural: Telefonun yere tam dik durduğu konum beta = 90 derecedir. 
+            // Hastanın konforlu okuma ve tutuş açısını dengelemek için nötral dikey ekseni 75 dereceye sabitledik.
+            let verticalNeutral = 75; 
+            
+            let deltaTilt = rawTilt; // Telefon düz durduğunda gamma zaten sıfıra yakındır
+            let deltaPitch = rawPitch - verticalNeutral; 
 
             if (Math.abs(deltaTilt) < 1.5) deltaTilt = 0;
             if (Math.abs(deltaPitch) < 1.5) deltaPitch = 0;
 
-            let clampedDeltaTilt = Math.max(-18, Math.min(18, deltaTilt));
-            let clampedDeltaPitch = Math.max(-18, Math.min(18, deltaPitch));
+            let clampedDeltaTilt = Math.max(-20, Math.min(20, deltaTilt));
+            let clampedDeltaPitch = Math.max(-20, Math.min(20, deltaPitch));
 
-            // HAREKET YÖNÜ DÜZELTMESİ CRITICAL:
-            // deltaPitch negatif olduğunda baş yukarı kalkıyor demektir. 
-            // Bunu uçağın pozitif Y eksenine (Yukarı tırmanışa) çevirmek için işareti '+' yaptık.
-            targetX = (clampedDeltaTilt / 18) * 6.5;   
-            targetY = (clampedDeltaPitch / 18) * 5.0; // Eksi işareti kaldırıldı, yön fiziksel hareketle tam eşitlendi.
+            // Tam dikey bağımlı yön eşleme (Hassaslaştırılmış çarpanlar)
+            targetX = (clampedDeltaTilt / 20) * 6.5;   
+            targetY = (clampedDeltaPitch / 20) * 5.0; 
 
             playerPlane.setAttribute('rotation', `0 0 ${-clampedDeltaTilt * 2.2}`);
         }
@@ -288,9 +288,14 @@
             let corePos = flightCore.getAttribute('position');
             corePos.z -= forwardSpeed;
 
+            // Nehir takibi (Sonsuz akış görünümü)
             let rPos = zenRiver.getAttribute('position');
             rPos.z = corePos.z;
             zenRiver.setAttribute('position', rPos);
+            
+            let rcPos = riverCore.getAttribute('position');
+            rcPos.z = corePos.z;
+            riverCore.setAttribute('position', rcPos);
 
             currentX += (targetX - currentX) * 0.22;
             currentY += (targetY - currentY) * 0.22;
@@ -321,9 +326,11 @@
 
             let ring = document.createElement('a-torus');
             ring.setAttribute('id', `ring-${ringCounter++}`);
-            ring.setAttribute('radius', '0.65'); 
-            ring.setAttribute('radius-tubular', '0.04');
-            ring.setAttribute('color', '#e11d48'); 
+            
+            // İSTEK: Halkalar belirgin şekilde büyütüldü (0.65 -> 0.95, kalınlık 0.04 -> 0.06)
+            ring.setAttribute('radius', '0.95'); 
+            ring.setAttribute('radius-tubular', '0.06');
+            ring.setAttribute('color', '#f43f5e'); 
             ring.setAttribute('position', `${spawnX} ${spawnY} ${spawnZ}`);
             
             courseContainer.appendChild(ring);
@@ -348,14 +355,15 @@
                     let diffY = planePos.y - r.y;
                     let absoluteDistance = Math.sqrt(diffX*diffX + diffY*diffY);
 
-                    if (absoluteDistance <= 0.85) { 
+                    // Halka büyüdüğü için başarı alanı da toleranslı hale getirildi
+                    if (absoluteDistance <= 1.1) { 
                         score++;
                         uiScore.textContent = score;
-                        r.element.setAttribute('color', '#15803d'); 
-                        playZenSound(580, 'sine');
+                        r.element.setAttribute('color', '#10b981'); 
+                        playZenSound(580, 'sine', 0.15); // Başarı ses efekti
                     } else {
                         r.element.setAttribute('color', '#64748b'); 
-                        playZenSound(150, 'triangle');
+                        playZenSound(150, 'triangle', 0.12); // Kaçırma ses efekti
                     }
 
                     setTimeout(() => {
@@ -367,7 +375,51 @@
             }
         }
 
-        function playZenSound(frequency, type) {
+        // SENTEZLENMİŞ ARKA PLAN ZEN MÜZİĞİ MOTORU (Ritmik & Rahatlatıcı)
+        function startAmbientZenMusic() {
+            let step = 0;
+            const notes = [220, 261.63, 293.66, 329.63, 392.00, 440]; // Pentatonik dinlendirici skala
+            
+            ambientBpmInterval = setInterval(() => {
+                if (!audioCtx) return;
+                
+                // Yumuşak Melodi Katmanı
+                if (step % 2 === 0) {
+                    let osc = audioCtx.createOscillator();
+                    let gain = audioCtx.createGain();
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    
+                    let currentNote = notes[Math.floor(Math.random() * notes.length)];
+                    osc.frequency.setValueAtTime(currentNote / 2, audioCtx.currentTime); // Bas/Meditatif tonlar
+                    osc.type = 'triangle';
+                    
+                    gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1.8);
+                    
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 1.8);
+                }
+                
+                // Hipnotik Altyapı Nabız Ritmi (Zen Metronomu)
+                if (step % 4 === 0) {
+                    let subOsc = audioCtx.createOscillator();
+                    let subGain = audioCtx.createGain();
+                    subOsc.connect(subGain);
+                    subGain.connect(audioCtx.destination);
+                    subOsc.frequency.setValueAtTime(73.42, audioCtx.currentTime); // Çok derinden gelen yumuşak vuruş
+                    subOsc.type = 'sine';
+                    subGain.gain.setValueAtTime(0.06, audioCtx.currentTime);
+                    subGain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.4);
+                    subOsc.start();
+                    subOsc.stop(audioCtx.currentTime + 0.4);
+                }
+
+                step++;
+            }, 600); // 100 BPM dingin tempo
+        }
+
+        function playZenSound(frequency, type, volume) {
             if (!audioCtx) return;
             let osc = audioCtx.createOscillator();
             let gain = audioCtx.createGain();
@@ -375,16 +427,17 @@
             gain.connect(audioCtx.destination);
             osc.frequency.setValueAtTime(frequency, audioCtx.currentTime);
             osc.type = type;
-            gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+            gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
             osc.start();
-            osc.stop(audioCtx.currentTime + 0.15);
+            osc.stop(audioCtx.currentTime + 0.2);
         }
 
         function terminateZenFlight() {
             cancelAnimationFrame(frameId);
             clearInterval(clockInterval);
             clearInterval(spawnInterval);
+            clearInterval(ambientBpmInterval);
             if (wakeLock) wakeLock.release();
             alert(`Seans Tamamlandı.\nHalka Geçiş Skorunuz: ${score}`);
             location.reload();
