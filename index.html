@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
     <meta charset="utf-8">
-    <title>ZenFlow - 3D Pırpır Uçak (Doğru Kamera)</title>
+    <title>ZenFlow - Gelişmiş Kalibrasyonlu Pırpır Uçak</title>
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&family=Azeret+Mono&display=swap" rel="stylesheet">
     
@@ -75,8 +75,8 @@
 
     <div id="start-screen">
         <div class="glass-panel">
-            <h2>ZEN COCKPIT - 3D UÇUŞ</h2>
-            <p>Tam Servikal Mobilizasyon Seansı<br>Başınızı sağa/sola yatırarak yönü, yukarı/aşağı eğerek yüksekliği kontrol edin.</p>
+            <h2>ZEN COCKPIT - HASSAS UÇUŞ</h2>
+            <p>Oturma pozisyonunuzu alın ve karşıya bakın. Başlat düğmesine bastığınız an duruşunuz "Merkez" olarak kalibre edilecektir.</p>
             
             <div class="menu-group">
                 <label for="speed-select">Uçuş Temposu (Hız)</label>
@@ -95,7 +95,7 @@
                 </select>
             </div>
 
-            <button id="start-btn">KOKPİTİ AÇ VE BAŞLA</button>
+            <button id="start-btn">POZİSYONU KALİBRE ET VE BAŞLA</button>
         </div>
     </div>
 
@@ -127,7 +127,6 @@
         </a-entity>
 
         <a-entity id="course-container"></a-entity>
-
         <a-entity id="scenery-group"></a-entity>
     </a-scene>
 
@@ -156,6 +155,11 @@
         let targetY = 0;
         let currentX = 0;
         let currentY = 0;
+
+        // DİNAMİK KALİBRASYON DEĞİŞKENLERİ
+        let baseTilt = null;
+        let basePitch = null;
+        let isCalibrated = false;
 
         for(let i=0; i<40; i++) {
             let side = i % 2 === 0 ? 1 : -1;
@@ -189,11 +193,12 @@
 
             window.addEventListener('deviceorientation', processBioFeedbackSensors);
 
+            // Gelişmiş Klavye Test Desteği (Aralıklar genişletildi)
             window.addEventListener('keydown', (e) => {
-                if (e.key === 'ArrowLeft') targetX = -3.8;
-                if (e.key === 'ArrowRight') targetX = 3.8;
-                if (e.key === 'ArrowUp') targetY = 2.5;
-                if (e.key === 'ArrowDown') targetY = -1.8;
+                if (e.key === 'ArrowLeft') targetX = -5.5; 
+                if (e.key === 'ArrowRight') targetX = 5.5;
+                if (e.key === 'ArrowUp') targetY = 4.0;
+                if (e.key === 'ArrowDown') targetY = -3.0;
             });
             window.addEventListener('keyup', () => { targetX = currentX; targetY = currentY; });
 
@@ -211,26 +216,42 @@
             spawnInterval = setInterval(generateNextRing, ringFrequency);
         }
 
+        // GELİŞMİŞ KALİBRASYONLU VE GENİŞLETİLMİŞ SENSÖR MOTORU
         function processBioFeedbackSensors(event) {
             let rawTilt = event.gamma; 
             if (window.orientation === 90) rawTilt = event.beta;
             if (window.orientation === -90) rawTilt = -event.beta;
-
             let rawPitch = event.beta; 
 
-            if (rawTilt !== null && rawPitch !== null) {
-                if (Math.abs(rawTilt) < 3) rawTilt = 0;
-                if (Math.abs(rawPitch - 45) < 3) rawPitch = 45; 
+            if (rawTilt === null || rawPitch === null) return;
 
-                let clampedTilt = Math.max(-25, Math.min(25, rawTilt));
-                let clampedPitch = Math.max(20, Math.min(70, rawPitch)) - 45; 
-
-                targetX = (clampedTilt / 25) * 3.8; 
-                targetY = (-clampedPitch / 25) * 2.5; 
-
-                // Uçak ileri baktığı için, yatış açısı (Z ekseni rotasyonu) yönünü düzeltttim
-                playerPlane.setAttribute('rotation', `0 0 ${-clampedTilt * 1.4}`);
+            // İlk gelen veriyi hastanın nötral (karşıya bakış) açısı olarak kilitle
+            if (!isCalibrated) {
+                baseTilt = rawTilt;
+                basePitch = rawPitch;
+                isCalibrated = true;
+                return;
             }
+
+            // Sapma miktarlarını (Nötral pozisyona göre farkı) bul
+            let deltaTilt = rawTilt - baseTilt;
+            let deltaPitch = rawPitch - basePitch;
+
+            // Ufak titremeleri süz, hareketi serbest bırak
+            if (Math.abs(deltaTilt) < 2) deltaTilt = 0;
+            if (Math.abs(deltaPitch) < 2) deltaPitch = 0;
+
+            // Limit sınırları (Boyun konfor açısı)
+            let clampedDeltaTilt = Math.max(-20, Math.min(20, deltaTilt));
+            let clampedDeltaPitch = Math.max(-20, Math.min(20, deltaPitch));
+
+            // YENİ ARALIK (RANGE) VE ÇARPAN GÜNCELLEMESİ
+            // Çarpanları büyüterek uçağın sağa/sola ve yukarı/aşağı gitme sınırını maksimuma çıkardım
+            targetX = (clampedDeltaTilt / 20) * 5.8;   // Artık çok daha fazla sağa/sola kayar
+            targetY = (-clampedDeltaPitch / 20) * 4.2; // Yukarı/Aşağı net çalışır hale getirildi
+
+            // Uçağın görsel yatış açısı (Feedback)
+            playerPlane.setAttribute('rotation', `0 0 ${-clampedDeltaTilt * 1.8}`);
         }
 
         let propRotation = 0;
@@ -238,8 +259,9 @@
             let corePos = flightCore.getAttribute('position');
             corePos.z -= forwardSpeed;
 
-            currentX += (targetX - currentX) * 0.15;
-            currentY += (targetY - currentY) * 0.15;
+            // Pürüzsüz yaklaşım (Lerp)
+            currentX += (targetX - currentX) * 0.18;
+            currentY += (targetY - currentY) * 0.18;
             
             corePos.x = currentX;
             corePos.y = currentY;
@@ -262,12 +284,13 @@
             let corePos = flightCore.getAttribute('position');
             let spawnZ = corePos.z - 45; 
 
-            let spawnX = (Math.random() - 0.5) * 6;  
-            let spawnY = (Math.random() - 0.5) * 3.6; 
+            // Genişleyen yeni sınırlara uygun olarak halkaların doğum alanını da büyüttüm
+            let spawnX = (Math.random() - 0.5) * 8.5;  // -4.25 ile +4.25 arası geniş alan
+            let spawnY = (Math.random() - 0.5) * 5.5;  // -2.75 ile +2.75 arası dikey alan
 
             let ring = document.createElement('a-torus');
             ring.setAttribute('id', `ring-${ringCounter++}`);
-            ring.setAttribute('radius', '0.5'); 
+            ring.setAttribute('radius', '0.6'); // Geniş aralıkta hedeflemeyi dengelemek için çapı hafif büyüttüm
             ring.setAttribute('radius-tubular', '0.03');
             ring.setAttribute('color', '#dc2626'); 
             ring.setAttribute('position', `${spawnX} ${spawnY} ${spawnZ}`);
@@ -294,7 +317,7 @@
                     let diffY = planePos.y - r.y;
                     let absoluteDistance = Math.sqrt(diffX*diffX + diffY*diffY);
 
-                    if (absoluteDistance <= 0.65) { 
+                    if (absoluteDistance <= 0.75) { 
                         score++;
                         uiScore.textContent = score;
                         r.element.setAttribute('color', '#16a34a'); 
@@ -332,7 +355,7 @@
             clearInterval(clockInterval);
             clearInterval(spawnInterval);
             if (wakeLock) wakeLock.release();
-            alert(`3 Dakikalık 3D Egzersiz Başarıyla Tamamlandı.\nToplam Geçiş Skorunuz: ${score}`);
+            alert(`Seans Tamamlandı.\nToplam Geçiş Skorunuz: ${score}`);
             location.reload();
         }
     </script>
